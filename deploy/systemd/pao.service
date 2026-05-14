@@ -24,7 +24,8 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 LockPersonality=true
-MemoryDenyWriteExecute=true
+# MemoryDenyWriteExecute desactivado: V8 precisa de páginas W+X para o JIT,
+# senão Node morre com SIGTRAP/status=5/TRAP.
 
 [Install]
 WantedBy=multi-user.target
