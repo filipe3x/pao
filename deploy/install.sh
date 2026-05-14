@@ -87,16 +87,58 @@ sudo -u "$APP_USER" env "PATH=$NODE_BIN_DIR:$PATH" bash -c "
   npm run db:seed
 "
 
-echo "==> 5. systemd unit"
-install -m 0644 "$REPO_DIR/deploy/systemd/pao.service" /etc/systemd/system/pao.service
-# Patch ExecStart com o path absoluto do node detectado em (2).
-# systemd não carrega o profile do user, portanto precisa do binário exacto.
-sed -i "s|^ExecStart=/usr/bin/node|ExecStart=$NODE_BIN|" /etc/systemd/system/pao.service
-echo "    $(grep ^ExecStart= /etc/systemd/system/pao.service)"
-systemctl daemon-reload
-systemctl enable --now pao
-sleep 1
-systemctl status pao --no-pager -l | head -8 || true
+echo "==> 5. PM2 — migrar de systemd (se aplicável) + ecosystem + start/reload"
+
+# 5a) Limpeza: se a unit systemd antiga ainda existir, pará-la e remover.
+if systemctl list-unit-files | grep -q '^pao\.service'; then
+  echo "    pao.service detectada (legado) — disable + stop + rm"
+  systemctl disable --now pao &>/dev/null || true
+  rm -f /etc/systemd/system/pao.service
+  systemctl daemon-reload
+fi
+
+# 5b) Localizar pm2 no ambiente do user (provavelmente em ~ember/.nvm/.../bin/pm2).
+PM2_BIN="$(sudo -u "$APP_USER" bash -c "source '$NVM_SH' && command -v pm2" 2>/dev/null || true)"
+if [[ -z "$PM2_BIN" ]]; then
+  echo "[!] pm2 não está instalado para $APP_USER. Instala com:" >&2
+  echo "    sudo -u $APP_USER bash -lc 'npm i -g pm2'" >&2
+  exit 1
+fi
+echo "    pm2 em $PM2_BIN"
+
+# 5c) Gerar /var/www/pao/ecosystem.config.cjs com o interpreter absoluto.
+cat > "$REPO_DIR/ecosystem.config.cjs" <<EOF
+// Gerado por deploy/install.sh — NÃO editar à mão (re-corre o install.sh).
+module.exports = {
+  apps: [{
+    name: "pao",
+    cwd: "$REPO_DIR",
+    script: "dist-server/index.js",
+    interpreter: "$NODE_BIN",
+    node_args: "--env-file=.env",
+    env: { NODE_ENV: "production" },
+    instances: 1,
+    exec_mode: "fork",
+    autorestart: true,
+    max_restarts: 10
+  }]
+};
+EOF
+chown "$APP_USER:$APP_GROUP" "$REPO_DIR/ecosystem.config.cjs"
+
+# 5d) Falar com o pm2 daemon do ember: start se ainda não existe, reload se existe.
+pm2_as_user() {
+  sudo -u "$APP_USER" env "PATH=$NODE_BIN_DIR:$PATH" "$PM2_BIN" "$@"
+}
+if pm2_as_user describe pao &>/dev/null; then
+  echo "    'pao' já está na lista pm2 — reload (zero-downtime quando possível)"
+  pm2_as_user reload "$REPO_DIR/ecosystem.config.cjs" --update-env
+else
+  echo "    'pao' ainda não existe — pm2 start"
+  pm2_as_user start "$REPO_DIR/ecosystem.config.cjs"
+fi
+pm2_as_user save
+pm2_as_user list
 
 echo "==> 6. Vhost Apache"
 VHOST_DST="/etc/apache2/sites-available/$DOMAIN.conf"

@@ -21,6 +21,9 @@ data/
 .env.local
 .env.*.local
 
+# pm2 (gerado pelo deploy/install.sh, com o path absoluto do node)
+ecosystem.config.cjs
+
 # logs
 *.log
 npm-debug.log*

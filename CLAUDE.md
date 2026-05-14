@@ -75,11 +75,12 @@ Há **dois `tsconfig.json` separados** (client e server) ligados por um `tsconfi
 Deploy real é no VPS `brasume` (mesma máquina de `curvsync`, `words`, `sleep`, `embers`). Convenção:
 
 - Código em `/var/www/pao/`, dono `ember:http-web`
+- **Process manager: PM2**, igual aos outros serviços do VPS (curvsync, isleep, words). Node 22 via nvm do user `ember`.
 - Apache serve `client/dist/` directamente (DocumentRoot); só `/api` e `/healthz` vão por proxy para Node em `127.0.0.1:3050`
 - Vhost único em `scripts/apache/pao.brasume.com.conf.example` (HTTP redirect + HTTPS no mesmo ficheiro, estilo Curve-sync)
 - SQLite em `/var/www/pao/data/pao.db`; backups em `/var/www/pao/data/backups/`
 
-`deploy/install.sh` faz o post-clone (build, systemd, vhost, cron) **assumindo Apache+Certbot já instalados**. `ROADMAP.md` tem o passo-a-passo greenfield original — útil como referência mas o deploy real segue `deploy/README.md`.
+`deploy/install.sh` faz o post-clone (build, pm2, vhost, cron) **assumindo Apache+Certbot+PM2 já instalados** (o `pm2 startup` do ember já existe — só corremos `pm2 save`). Se uma versão antiga deixou `pao.service` no systemd, o install.sh detecta e remove. `ecosystem.config.cjs` é gerado pelo install.sh (com o path absoluto do node 22) e está em `.gitignore`. `ROADMAP.md` tem o passo-a-passo greenfield original — útil como referência mas o deploy real segue `deploy/README.md`.
 
 **O Node em produção** continua a saber servir o SPA (cache headers + SPA fallback em `server/index.ts`), mas atrás de Apache esse código é redundante — Apache catch-all everything except `/api` e `/healthz`. Não remover; serve para correr `npm start` localmente sem Apache.
 
