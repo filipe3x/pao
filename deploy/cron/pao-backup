@@ -1,0 +1,23 @@
+#!/bin/sh
+# Backup diário do SQLite via VACUUM INTO (snapshot consistente).
+# Copiar para /etc/cron.daily/pao-backup e dar +x.
+set -e
+
+DB=/var/lib/pao/pao.db
+DEST=/var/lib/pao/backups
+TS=$(date +%F)
+RETAIN_DAYS=30
+
+if [ ! -f "$DB" ]; then
+    echo "[pao-backup] $DB não existe, skip." >&2
+    exit 0
+fi
+
+install -d -o pao -g pao "$DEST"
+sudo -u pao sqlite3 "$DB" "VACUUM INTO '$DEST/pao-$TS.db'"
+
+# Retenção
+find "$DEST" -name 'pao-*.db' -mtime "+$RETAIN_DAYS" -delete
+
+# Off-site (opcional) — descomenta e configura rclone primeiro.
+# rclone copy "$DEST/pao-$TS.db" remote:pao-backups/ --quiet
