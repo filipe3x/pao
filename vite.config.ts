@@ -37,6 +37,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,                           // 0.0.0.0 — acessível na LAN
+    allowedHosts: [".local", ".lan"],     // raspberrypi.local, pao.lan, etc.
     proxy: {
       "/api": "http://localhost:3000",
       "/healthz": "http://localhost:3000"
