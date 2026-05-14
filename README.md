@@ -29,7 +29,8 @@ Para destrancar a edição dos defaults, clicar no 🔒 e usar a `ADMIN_PASSWORD
 | `npm run build`      | Build do client (`client/dist/`) e do server (`dist-server/`) |
 | `npm start`          | Corre o build de produção (server serve o SPA + API) |
 | `npm test`           | Vitest (unit, 18 testes) |
-| `npm run test:e2e`   | Playwright (smoke) |
+| `npm run test:e2e`   | Playwright (smoke). Primeira vez: `npx playwright install chromium` |
+| `npm run icons:gen`  | Regenera os PNGs do PWA a partir de `scripts/icon-source*.svg` |
 | `npm run db:seed`    | Popula a receita base no SQLite |
 | `npm run db:reset`   | Apaga `data/pao.db` e refaz seed |
 | `npm run db:backup`  | `VACUUM INTO data/backups/pao-<data>.db` |
