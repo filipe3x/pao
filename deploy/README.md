@@ -3,22 +3,27 @@
 Adaptado à convenção do VPS `brasume` (mesma máquina de `curvsync`, `words`, `sleep`, `embers`):
 
 - **App em** `/var/www/pao/`
-- **Corre como** `ember:http-web`
+- **Corre como** `ember:http-web` — process manager **PM2** (igual a curvsync / isleep / words)
 - **Apache** serve o SPA directamente do `client/dist/`; só `/api` (e `/healthz`) vão por proxy para o Node
-- **Node** escuta em `127.0.0.1:3050` (porto reservado para pao neste VPS)
+- **Node** escuta em `127.0.0.1:3050` (porto reservado para pao neste VPS); Node 22 via nvm
 - **SQLite** em `/var/www/pao/data/pao.db`, backups em `/var/www/pao/data/backups/`
 
 ## Layout
 
 ```
 deploy/
-├── install.sh                       # post-clone (build, systemd, vhost, cron)
-├── systemd/pao.service              # User=ember, Group=http-web, /var/www/pao
+├── install.sh                       # post-clone (build, pm2, vhost, cron)
 └── cron/pao-backup                  # VACUUM INTO diário, retém 30 dias
 
 scripts/apache/
 └── pao.brasume.com.conf.example     # vhost único (HTTP redirect + HTTPS)
+
+ecosystem.config.cjs                 # gerado pelo install.sh, gitignored
 ```
+
+> O `install.sh` assume que o `pm2 startup` (auto-arranque ao boot) já está
+> configurado para o user `ember` — é o caso neste VPS porque curvsync /
+> isleep / words já lá vivem. Só corre `pm2 save` no fim.
 
 ## Playbook (a partir do `ember@brasume`)
 
@@ -56,19 +61,26 @@ curl -sf https://pao.brasume.com/api/recipes | python3 -m json.tool | head -10
 ```bash
 cd /var/www/pao
 sudo -u ember git pull
-sudo -u ember npm ci
-sudo -u ember npm run build
-sudo systemctl restart pao
+sudo bash deploy/install.sh      # re-corre build + pm2 reload (zero-downtime quando dá)
+```
+
+Ou, se só queres reiniciar sem rebuild:
+
+```bash
+pm2 restart pao
 ```
 
 ## Operação
 
 | Tarefa | Comando |
 |---|---|
-| Logs Node       | `journalctl -u pao -f` |
+| Lista pm2       | `pm2 list` (deve aparecer `pao` junto a curvsync / isleep / words) |
+| Logs Node       | `pm2 logs pao` (sai com `Ctrl+C`) |
 | Logs Apache     | `tail -f /var/log/apache2/pao_access.log /var/log/apache2/pao_error.log` |
-| Restart Node    | `sudo systemctl restart pao` |
+| Restart Node    | `pm2 restart pao` |
+| Reload (0-DT)   | `pm2 reload pao` |
+| Stop / Start    | `pm2 stop pao` · `pm2 start pao` |
 | Reload Apache   | `sudo systemctl reload apache2` |
 | Renovação cert  | automática via `certbot.timer`; testar: `sudo certbot renew --dry-run` |
 | Backup manual   | `sudo -u ember sqlite3 /var/www/pao/data/pao.db "VACUUM INTO '/tmp/pao-now.db'"` |
-| Restore         | `sudo systemctl stop pao && sudo -u ember cp /tmp/pao-bk.db /var/www/pao/data/pao.db && sudo systemctl start pao` |
+| Restore         | `pm2 stop pao && sudo -u ember cp /tmp/pao-bk.db /var/www/pao/data/pao.db && pm2 start pao` |

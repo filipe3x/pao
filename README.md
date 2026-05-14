@@ -83,19 +83,20 @@ sudo bash deploy/install.sh                # 2.ª vez: detecta cert, vhost final
 curl -I https://pao.brasume.com/healthz
 ```
 
-**Arquitectura em prod:** Apache serve `client/dist/` directamente; Node em `127.0.0.1:3050` trata só de `/api` e `/healthz`. SQLite em `/var/www/pao/data/`.
+**Arquitectura em prod:** Apache serve `client/dist/` directamente; Node em `127.0.0.1:3050` trata só de `/api` e `/healthz`. O processo Node é gerido por **PM2** (igual a curvsync / isleep / words no mesmo VPS). SQLite em `/var/www/pao/data/`.
 
 ## Operação
 
 | Tarefa | Comando |
 |---|---|
-| Logs do daemon          | `journalctl -u pao -f` |
-| Restart                 | `systemctl restart pao` |
-| Renovação certificado   | automática via `certbot.timer`; testar: `certbot renew --dry-run` |
-| Backup manual           | `sudo -u pao sqlite3 /var/lib/pao/pao.db "VACUUM INTO '/tmp/pao-now.db'"` |
+| Listar processos        | `pm2 list` |
+| Logs do daemon          | `pm2 logs pao` |
+| Restart                 | `pm2 restart pao` (ou `pm2 reload pao` para zero-downtime) |
+| Renovação certificado   | automática via `certbot.timer`; testar: `sudo certbot renew --dry-run` |
+| Backup manual           | `sudo -u ember sqlite3 /var/www/pao/data/pao.db "VACUUM INTO '/tmp/pao-now.db'"` |
 | Backup diário           | `cron.daily/pao-backup` (instalado pelo `install.sh`) |
-| Restaurar               | `systemctl stop pao` → substituir `/var/lib/pao/pao.db` por backup → `systemctl start pao` |
-| Actualizar código       | `cd /opt/pao/app && git pull && sudo -u pao npm ci && sudo -u pao npm run build && sudo systemctl restart pao` |
+| Restaurar               | `pm2 stop pao` → substituir `/var/www/pao/data/pao.db` por backup → `pm2 start pao` |
+| Actualizar código       | `cd /var/www/pao && sudo -u ember git pull && sudo bash deploy/install.sh` |
 | Trancar admin no browser| limpar `sessionStorage` ou clicar no 🔓 |
 
 ## Critérios de aceitação
