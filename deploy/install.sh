@@ -45,22 +45,47 @@ echo "==> 1. Permissões do repo (ember:http-web)"
 chown -R "$APP_USER:$APP_GROUP" "$REPO_DIR"
 install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$DATA_DIR" "$DATA_DIR/backups"
 
-echo "==> 2. Confirmar Node 22 (carrega o profile do $APP_USER para apanhar nvm)"
-NODE_BIN="$(sudo -u "$APP_USER" bash -lc 'command -v node' 2>/dev/null || true)"
-NODE_V="$(sudo -u "$APP_USER" bash -lc 'node -v' 2>/dev/null || true)"
+echo "==> 2. Detectar Node 22 para $APP_USER"
+USER_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
+NVM_SH="$USER_HOME/.nvm/nvm.sh"
+
+resolve_node() {
+  # 1. Override explícito via env (deploy/install.sh NODE_BIN_OVERRIDE=/path/node)
+  if [[ -n "${NODE_BIN_OVERRIDE:-}" ]]; then echo "$NODE_BIN_OVERRIDE"; return; fi
+  # 2. nvm directo (mais fiável: source da nvm.sh em vez de depender de profile/bashrc)
+  if [[ -s "$NVM_SH" ]]; then
+    sudo -u "$APP_USER" bash -c "source '$NVM_SH' && nvm which default 2>/dev/null" && return
+  fi
+  # 3. Glob (fallback)
+  local g
+  g="$(ls -1 "$USER_HOME"/.nvm/versions/node/v22.*/bin/node 2>/dev/null | sort -V | tail -1 || true)"
+  if [[ -n "$g" ]]; then echo "$g"; return; fi
+  # 4. PATH normal (provavelmente Node antigo do sistema)
+  command -v node || true
+}
+
+NODE_BIN="$(resolve_node)"
+NODE_V="$(sudo -u "$APP_USER" "$NODE_BIN" -v 2>/dev/null || true)"
 if [[ ! "$NODE_V" =~ ^v22\. ]]; then
-  echo "[!] Node 22 não detectado para $APP_USER (got: '$NODE_V')." >&2
-  echo "    Se usas nvm, garante que 'nvm alias default 22' está activo." >&2
-  echo "    Ou instala via NodeSource:  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash - && sudo apt-get install -y nodejs" >&2
+  echo "[!] Node 22 não detectado para $APP_USER (got: '$NODE_V' em '$NODE_BIN')." >&2
+  echo "    Se usas nvm: 'nvm install 22 && nvm alias default 22' e re-corre o install.sh." >&2
+  echo "    Ou força com:  sudo NODE_BIN_OVERRIDE=/caminho/para/node bash deploy/install.sh" >&2
   exit 1
 fi
+NODE_BIN_DIR="$(dirname "$NODE_BIN")"
 echo "    Node $NODE_V em $NODE_BIN"
 
 echo "==> 3. Módulos Apache necessários"
 a2enmod proxy proxy_http rewrite headers ssl deflate mime >/dev/null
 
-echo "==> 4. npm ci + build + seed (como $APP_USER)"
-sudo -u "$APP_USER" bash -lc "cd '$REPO_DIR' && npm ci && npm run build && npm run db:seed"
+echo "==> 4. npm ci + build + seed (como $APP_USER, com Node 22 no PATH)"
+sudo -u "$APP_USER" env "PATH=$NODE_BIN_DIR:$PATH" bash -c "
+  cd '$REPO_DIR'
+  node -v
+  npm ci
+  npm run build
+  npm run db:seed
+"
 
 echo "==> 5. systemd unit"
 install -m 0644 "$REPO_DIR/deploy/systemd/pao.service" /etc/systemd/system/pao.service
