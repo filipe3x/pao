@@ -3,8 +3,8 @@
 # Copiar para /etc/cron.daily/pao-backup e dar +x.
 set -e
 
-DB=/var/lib/pao/pao.db
-DEST=/var/lib/pao/backups
+DB=/var/www/pao/data/pao.db
+DEST=/var/www/pao/data/backups
 TS=$(date +%F)
 RETAIN_DAYS=30
 
@@ -13,11 +13,8 @@ if [ ! -f "$DB" ]; then
     exit 0
 fi
 
-install -d -o pao -g pao "$DEST"
-sudo -u pao sqlite3 "$DB" "VACUUM INTO '$DEST/pao-$TS.db'"
+install -d -o ember -g http-web -m 0750 "$DEST"
+sudo -u ember sqlite3 "$DB" "VACUUM INTO '$DEST/pao-$TS.db'"
 
 # Retenção
 find "$DEST" -name 'pao-*.db' -mtime "+$RETAIN_DAYS" -delete
-
-# Off-site (opcional) — descomenta e configura rclone primeiro.
-# rclone copy "$DEST/pao-$TS.db" remote:pao-backups/ --quiet

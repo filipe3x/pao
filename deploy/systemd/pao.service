@@ -1,13 +1,13 @@
 [Unit]
-Description=pao.brasume.com — calculadora de pão
+Description=pao.brasume.com — API Node (SQLite)
 After=network.target
 
 [Service]
 Type=simple
-User=pao
-Group=pao
-WorkingDirectory=/opt/pao/app
-EnvironmentFile=/opt/pao/app/.env
+User=ember
+Group=http-web
+WorkingDirectory=/var/www/pao
+EnvironmentFile=/var/www/pao/.env
 ExecStart=/usr/bin/node --env-file=.env dist-server/index.js
 Restart=on-failure
 RestartSec=3
@@ -17,7 +17,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/pao
+ReadWritePaths=/var/www/pao/data
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

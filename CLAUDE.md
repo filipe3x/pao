@@ -72,7 +72,16 @@ Há **dois `tsconfig.json` separados** (client e server) ligados por um `tsconfi
 
 ## Deploy
 
-Tudo em [`deploy/`](./deploy/) — `install.sh` idempotente, vhosts Apache (HTTP pré-Certbot + HTTPS endurecido), unit systemd com hardening, cron de backup. Detalhe operacional em [`deploy/README.md`](./deploy/README.md); o passo-a-passo "manual" com explicações em [`ROADMAP.md`](./ROADMAP.md).
+Deploy real é no VPS `brasume` (mesma máquina de `curvsync`, `words`, `sleep`, `embers`). Convenção:
+
+- Código em `/var/www/pao/`, dono `ember:http-web`
+- Apache serve `client/dist/` directamente (DocumentRoot); só `/api` e `/healthz` vão por proxy para Node em `127.0.0.1:3050`
+- Vhost único em `scripts/apache/pao.brasume.com.conf.example` (HTTP redirect + HTTPS no mesmo ficheiro, estilo Curve-sync)
+- SQLite em `/var/www/pao/data/pao.db`; backups em `/var/www/pao/data/backups/`
+
+`deploy/install.sh` faz o post-clone (build, systemd, vhost, cron) **assumindo Apache+Certbot já instalados**. `ROADMAP.md` tem o passo-a-passo greenfield original — útil como referência mas o deploy real segue `deploy/README.md`.
+
+**O Node em produção** continua a saber servir o SPA (cache headers + SPA fallback em `server/index.ts`), mas atrás de Apache esse código é redundante — Apache catch-all everything except `/api` e `/healthz`. Não remover; serve para correr `npm start` localmente sem Apache.
 
 CI em `.github/workflows/ci.yml`: `lint + test + build + seed sanity-check` em Node 22.
 

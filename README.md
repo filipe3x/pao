@@ -67,20 +67,23 @@ Para destrancar a edição dos defaults, clicar no 🔒 e usar a `ADMIN_PASSWORD
 
 ## Deploy
 
-Resumo (detalhe em [`deploy/README.md`](./deploy/README.md) e [`ROADMAP.md`](./ROADMAP.md)):
+Resumo para o VPS `brasume` (detalhe em [`deploy/README.md`](./deploy/README.md)):
 
 ```bash
-# No servidor (root, Debian/Ubuntu)
-git clone <repo> /opt/pao/app
-cd /opt/pao/app
-sudo -u pao cp .env.example .env && sudo -u pao $EDITOR .env
-sudo bash deploy/install.sh /opt/pao/app
+# No VPS, como ember
+cd /var/www
+sudo git clone https://github.com/filipe3x/pao.git
+sudo chown -R ember:http-web pao
+cd pao
+cp .env.example .env && $EDITOR .env       # NODE_ENV=production + segredos fortes
+sudo bash deploy/install.sh
 sudo certbot --apache -d pao.brasume.com --redirect --hsts --staple-ocsp \
     --agree-tos -m webmaster@brasume.com --no-eff-email
-sudo cp deploy/apache/pao.brasume.com-le-ssl.conf /etc/apache2/sites-available/
-sudo apache2ctl configtest && sudo systemctl reload apache2
+# re-activar o HTTP→HTTPS redirect (ver deploy/README.md passo 5)
 curl -I https://pao.brasume.com/healthz
 ```
+
+**Arquitectura em prod:** Apache serve `client/dist/` directamente; Node em `127.0.0.1:3050` trata só de `/api` e `/healthz`. SQLite em `/var/www/pao/data/`.
 
 ## Operação
 

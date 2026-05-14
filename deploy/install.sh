@@ -1,102 +1,95 @@
 #!/usr/bin/env bash
 #
-# Provisioning chave-na-mão para pao.brasume.com — Apache2 + Node 22 + systemd.
-# Correr como root (ou via sudo) num Debian/Ubuntu recente.
+# Post-clone deploy para pao.brasume.com no VPS brasume.
+# Assume:
+#   - Apache2 + Certbot já instalados e configurados (outros sites a correr)
+#   - Utilizador 'ember' e grupo 'http-web' já existem
+#   - Node 22 disponível no PATH (NodeSource ou similar)
+#   - Repo clonado em /var/www/pao
 #
-# Idempotente: pode ser re-executado em segurança.
+# Idempotente. Correr como ember (com sudo onde indicado).
 #
 # Uso:
-#   sudo bash deploy/install.sh /caminho/para/clone/pao
-#
-# Onde "/caminho/para/clone/pao" é a directoria onde já clonaste este repo
-# (incluindo o sub-directório dist-server e client/dist do build de produção).
+#   cd /var/www/pao
+#   sudo bash deploy/install.sh
 
 set -euo pipefail
 
-REPO_DIR="${1:-/opt/pao/app}"
-APP_USER="pao"
-APP_HOME="/opt/pao"
-DATA_DIR="/var/lib/pao"
+REPO_DIR="${REPO_DIR:-/var/www/pao}"
+APP_USER="ember"
+APP_GROUP="http-web"
+DATA_DIR="$REPO_DIR/data"
 DOMAIN="pao.brasume.com"
-ADMIN_EMAIL="webmaster@brasume.com"
 
 if [[ $EUID -ne 0 ]]; then
-  echo "[!] Correr como root (sudo)." >&2
+  echo "[!] Correr com sudo." >&2
   exit 1
 fi
 
-echo "==> 1. Pacotes base"
-apt-get update
-apt-get install -y --no-install-recommends \
-  apache2 certbot python3-certbot-apache git curl ca-certificates ufw sqlite3
-
-echo "==> 2. Node 22 LTS (NodeSource)"
-if ! command -v node >/dev/null || [[ "$(node -v)" != v22.* ]]; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -y nodejs
-fi
-corepack enable
-
-echo "==> 3. Módulos Apache (proxy + ssl + http2 + rewrite + headers + deflate)"
-a2enmod proxy proxy_http proxy_wstunnel ssl http2 rewrite headers deflate >/dev/null || true
-
-echo "==> 4. Utilizador de serviço '$APP_USER'"
-if ! id "$APP_USER" >/dev/null 2>&1; then
-  adduser --system --group --home "$APP_HOME" --shell /usr/sbin/nologin "$APP_USER"
-fi
-install -d -o "$APP_USER" -g "$APP_USER" "$APP_HOME" "$DATA_DIR" "$DATA_DIR/backups"
-
-echo "==> 5. Build do código em $REPO_DIR"
 if [[ ! -d "$REPO_DIR" ]]; then
-  echo "[!] $REPO_DIR não existe. Clonar primeiro e voltar a correr." >&2
+  echo "[!] $REPO_DIR não existe. Faz git clone para esse caminho primeiro." >&2
   exit 1
 fi
-chown -R "$APP_USER:$APP_USER" "$REPO_DIR"
-sudo -u "$APP_USER" bash -lc "cd '$REPO_DIR' && npm ci && npm run build && npm run db:seed"
 
 if [[ ! -f "$REPO_DIR/.env" ]]; then
-  echo "[!] $REPO_DIR/.env não existe. Cria a partir do .env.example antes de continuar:" >&2
-  echo "    sudo -u $APP_USER cp $REPO_DIR/.env.example $REPO_DIR/.env" >&2
-  echo "    sudo -u $APP_USER \$EDITOR $REPO_DIR/.env   # set ADMIN_PASSWORD e ADMIN_SESSION_SECRET" >&2
+  cat >&2 <<EOF
+[!] $REPO_DIR/.env não existe. Cria-o primeiro:
+    sudo -u $APP_USER cp $REPO_DIR/.env.example $REPO_DIR/.env
+    sudo -u $APP_USER \$EDITOR $REPO_DIR/.env
+        # set NODE_ENV=production, ADMIN_PASSWORD, ADMIN_SESSION_SECRET (>=16)
+EOF
   exit 1
 fi
 
-echo "==> 6. Instalar unit systemd"
-install -m 0644 "$REPO_DIR/deploy/systemd/pao.service" /etc/systemd/system/pao.service
-# Ajustar WorkingDirectory se o REPO_DIR não for o default
-if [[ "$REPO_DIR" != "/opt/pao/app" ]]; then
-  sed -i "s|/opt/pao/app|$REPO_DIR|g" /etc/systemd/system/pao.service
+echo "==> 1. Permissões do repo (ember:http-web)"
+chown -R "$APP_USER:$APP_GROUP" "$REPO_DIR"
+install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$DATA_DIR" "$DATA_DIR/backups"
+
+echo "==> 2. Confirmar Node 22"
+NODE_V="$(sudo -u "$APP_USER" node -v 2>/dev/null || true)"
+if [[ ! "$NODE_V" =~ ^v22\. ]]; then
+  echo "[!] Node 22 não detectado para $APP_USER (got: '$NODE_V')." >&2
+  echo "    Instala via NodeSource:  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash - && sudo apt-get install -y nodejs" >&2
+  exit 1
 fi
+
+echo "==> 3. Módulos Apache necessários"
+a2enmod proxy proxy_http rewrite headers ssl deflate mime >/dev/null
+
+echo "==> 4. npm ci + build + seed (como $APP_USER)"
+sudo -u "$APP_USER" bash -lc "cd '$REPO_DIR' && npm ci && npm run build && npm run db:seed"
+
+echo "==> 5. systemd unit"
+install -m 0644 "$REPO_DIR/deploy/systemd/pao.service" /etc/systemd/system/pao.service
 systemctl daemon-reload
 systemctl enable --now pao
-systemctl status pao --no-pager -l | head -5 || true
+systemctl status pao --no-pager -l | head -8 || true
 
-echo "==> 7. Vhost Apache (porta 80) — pré-Certbot"
-install -m 0644 "$REPO_DIR/deploy/apache/$DOMAIN.conf" "/etc/apache2/sites-available/$DOMAIN.conf"
-a2ensite "$DOMAIN" >/dev/null
-apache2ctl configtest
-systemctl reload apache2
+echo "==> 6. Vhost Apache (se ainda não existir)"
+VHOST_DST="/etc/apache2/sites-available/$DOMAIN.conf"
+if [[ ! -f "$VHOST_DST" ]]; then
+  install -m 0644 "$REPO_DIR/scripts/apache/$DOMAIN.conf.example" "$VHOST_DST"
+  a2ensite "$DOMAIN.conf" >/dev/null
+  # Pré-cert: comentar o redirect HTTP→HTTPS para o desafio HTTP-01 funcionar
+  sed -i 's|^  RewriteEngine On|  #RewriteEngine On|; s|^  RewriteCond %{SERVER_NAME}|  #RewriteCond %{SERVER_NAME}|; s|^  RewriteRule \^ https|  #RewriteRule ^ https|' "$VHOST_DST"
+  apache2ctl configtest
+  systemctl reload apache2
+  echo "    Vhost instalado com o redirect HTTP comentado (até o Certbot correr)."
+else
+  echo "    $VHOST_DST já existe — não toco."
+fi
 
-echo "==> 8. Firewall (ufw)"
-ufw allow OpenSSH >/dev/null
-ufw allow 'Apache Full' >/dev/null
-ufw --force enable >/dev/null
-
-echo "==> 9. Cron diário de backup do SQLite"
+echo "==> 7. Cron diário de backup"
 install -m 0755 "$REPO_DIR/deploy/cron/pao-backup" /etc/cron.daily/pao-backup
 
 echo
-echo "==> Pronto. Falta o passo manual do Certbot:"
+echo "==> Pronto. Falta:"
 echo
-echo "    sudo certbot --apache \\"
-echo "        -d $DOMAIN \\"
-echo "        --redirect --hsts --staple-ocsp \\"
-echo "        --agree-tos -m $ADMIN_EMAIL --no-eff-email"
+echo "  sudo certbot --apache -d $DOMAIN --redirect --hsts --staple-ocsp \\"
+echo "      --agree-tos -m webmaster@brasume.com --no-eff-email"
 echo
-echo "Depois, substituir o vhost SSL pelo template endurecido:"
-echo "    sudo cp $REPO_DIR/deploy/apache/$DOMAIN-le-ssl.conf \\"
-echo "           /etc/apache2/sites-available/$DOMAIN-le-ssl.conf"
-echo "    sudo apache2ctl configtest && sudo systemctl reload apache2"
+echo "  # depois (o cert popula os paths /etc/letsencrypt/live/$DOMAIN/...):"
+echo "  sudo sed -i 's|^  #RewriteEngine On|  RewriteEngine On|; s|^  #RewriteCond %{SERVER_NAME}|  RewriteCond %{SERVER_NAME}|; s|^  #RewriteRule \^ https|  RewriteRule ^ https|' $VHOST_DST"
+echo "  sudo apache2ctl configtest && sudo systemctl reload apache2"
 echo
-echo "Smoke test:"
-echo "    curl -I https://$DOMAIN/healthz"
+echo "  curl -I https://$DOMAIN/healthz"
