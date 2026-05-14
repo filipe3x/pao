@@ -94,7 +94,8 @@ export async function fetchAllRecipes(): Promise<Recipe[]> {
   return details;
 }
 
-// Admin lock — preparado para Fase 3.
+// ── Admin (lock) ─────────────────────────────────────────────────
+
 export async function adminUnlock(password: string): Promise<string> {
   const r = await fetch("/api/admin/unlock", {
     method: "POST",
@@ -104,4 +105,62 @@ export async function adminUnlock(password: string): Promise<string> {
   if (!r.ok) throw new Error("invalid_password");
   const { token } = (await r.json()) as { token: string };
   return token;
+}
+
+function authJson(token: string): HeadersInit {
+  return { "content-type": "application/json", authorization: `Bearer ${token}` };
+}
+
+export interface AdminIngredientPatch {
+  name?: string;
+  grams?: number;
+  unit?: "ml" | null;
+  packagePrice?: number;
+  packageGrams?: number;
+  isFree?: boolean;
+  isExact?: boolean;
+  note?: string | null;
+}
+
+export interface AdminIngredientCreate extends AdminIngredientPatch {
+  sectionId: "seca" | "frescos" | "hacks";
+  name: string;
+  grams: number;
+  ingredientKey?: string;
+}
+
+export async function adminPatchIngredient(
+  token: string,
+  recipeId: string,
+  key: string,
+  patch: AdminIngredientPatch
+): Promise<void> {
+  const r = await fetch(
+    `/api/recipes/${encodeURIComponent(recipeId)}/ingredients/${encodeURIComponent(key)}`,
+    { method: "PATCH", headers: authJson(token), body: JSON.stringify(patch) }
+  );
+  if (!r.ok) throw new Error(`patch_ingredient_${r.status}`);
+}
+
+export async function adminAddIngredient(
+  token: string,
+  recipeId: string,
+  payload: AdminIngredientCreate
+): Promise<string> {
+  const r = await fetch(`/api/recipes/${encodeURIComponent(recipeId)}/ingredients`, {
+    method: "POST",
+    headers: authJson(token),
+    body: JSON.stringify(payload)
+  });
+  if (!r.ok) throw new Error(`add_ingredient_${r.status}`);
+  const { ingredientKey } = (await r.json()) as { ingredientKey: string };
+  return ingredientKey;
+}
+
+export async function adminRemoveIngredient(token: string, recipeId: string, key: string): Promise<void> {
+  const r = await fetch(
+    `/api/recipes/${encodeURIComponent(recipeId)}/ingredients/${encodeURIComponent(key)}`,
+    { method: "DELETE", headers: { authorization: `Bearer ${token}` } }
+  );
+  if (!r.ok) throw new Error(`delete_ingredient_${r.status}`);
 }

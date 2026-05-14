@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Ingredient, PriceOverride, Recipe, Section } from "./types";
 import { computeTotals, uid } from "./lib/calc";
-import { fetchAllRecipes } from "./lib/api";
+import {
+  adminAddIngredient,
+  adminPatchIngredient,
+  adminRemoveIngredient,
+  fetchAllRecipes,
+  type AdminIngredientPatch
+} from "./lib/api";
 import {
   addCustomRecipe,
   mutateCustomRecipe,
@@ -56,7 +62,17 @@ export function App() {
   );
 
   const isCustom = !!recipe?.custom;
-  const editable = isCustom || !!adminToken;
+  const isAdminEditingDefault = !isCustom && !!adminToken;
+  const editable = isCustom || isAdminEditingDefault;
+
+  const refreshDefaults = useCallback(async () => {
+    try {
+      const all = await fetchAllRecipes();
+      setDefaults(all);
+    } catch (e) {
+      console.error("refreshDefaults", e);
+    }
+  }, []);
 
   const totals = useMemo(
     () => (recipe ? computeTotals(recipe, state.loaves, recipePrices, state.includeHacks) : { dryG: 0, totalCost: 0, perLoaf: 0 }),
@@ -71,8 +87,27 @@ export function App() {
   );
 
   const onIngEdit = useCallback(
-    (sectionId: Section["id"], ingKey: string, patch: Partial<Ingredient>) => {
-      if (!recipe || !isCustom) return;
+    async (sectionId: Section["id"], ingKey: string, patch: Partial<Ingredient>) => {
+      if (!recipe) return;
+      if (isAdminEditingDefault && adminToken) {
+        const wire: AdminIngredientPatch = {};
+        if ("name" in patch) wire.name = patch.name;
+        if ("grams" in patch) wire.grams = patch.grams;
+        if ("unit" in patch) wire.unit = patch.unit ?? null;
+        if ("packagePrice" in patch) wire.packagePrice = patch.packagePrice;
+        if ("packageGrams" in patch) wire.packageGrams = patch.packageGrams;
+        if ("free" in patch) wire.isFree = patch.free;
+        if ("exact" in patch) wire.isExact = patch.exact;
+        if ("note" in patch) wire.note = patch.note ?? null;
+        try {
+          await adminPatchIngredient(adminToken, recipe.id, ingKey, wire);
+          await refreshDefaults();
+        } catch (e) {
+          console.error("admin patch failed", e);
+        }
+        return;
+      }
+      if (!isCustom) return;
       mutateCustomRecipe(recipe.id, (r) => ({
         ...r,
         sections: r.sections.map((s) =>
@@ -82,12 +117,22 @@ export function App() {
         )
       }));
     },
-    [recipe, isCustom]
+    [recipe, isCustom, isAdminEditingDefault, adminToken, refreshDefaults]
   );
 
   const onIngRemove = useCallback(
-    (sectionId: Section["id"], ingKey: string) => {
-      if (!recipe || !isCustom) return;
+    async (sectionId: Section["id"], ingKey: string) => {
+      if (!recipe) return;
+      if (isAdminEditingDefault && adminToken) {
+        try {
+          await adminRemoveIngredient(adminToken, recipe.id, ingKey);
+          await refreshDefaults();
+        } catch (e) {
+          console.error("admin remove failed", e);
+        }
+        return;
+      }
+      if (!isCustom) return;
       mutateCustomRecipe(recipe.id, (r) => ({
         ...r,
         sections: r.sections.map((s) =>
@@ -95,12 +140,28 @@ export function App() {
         )
       }));
     },
-    [recipe, isCustom]
+    [recipe, isCustom, isAdminEditingDefault, adminToken, refreshDefaults]
   );
 
   const onIngAdd = useCallback(
-    (sectionId: Section["id"]) => {
-      if (!recipe || !isCustom) return;
+    async (sectionId: Section["id"]) => {
+      if (!recipe) return;
+      if (isAdminEditingDefault && adminToken) {
+        try {
+          await adminAddIngredient(adminToken, recipe.id, {
+            sectionId,
+            name: "Novo ingrediente",
+            grams: 10,
+            packagePrice: 1.0,
+            packageGrams: 1000
+          });
+          await refreshDefaults();
+        } catch (e) {
+          console.error("admin add failed", e);
+        }
+        return;
+      }
+      if (!isCustom) return;
       mutateCustomRecipe(recipe.id, (r) => ({
         ...r,
         sections: r.sections.map((s) =>
@@ -122,7 +183,7 @@ export function App() {
         )
       }));
     },
-    [recipe, isCustom]
+    [recipe, isCustom, isAdminEditingDefault, adminToken, refreshDefaults]
   );
 
   if (loading) {
