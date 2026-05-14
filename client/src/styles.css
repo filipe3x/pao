@@ -381,6 +381,68 @@ body::before {
   .list-card { padding: 28px 24px; }
 }
 
+/* ── iPhone SE 3rd gen e similares (375pt) ──────────────── */
+@media (max-width: 480px) {
+  body { padding: 16px 12px 48px; }
+
+  /* Masthead — título e meta compactos */
+  .title { font-size: clamp(32px, 11vw, 44px); }
+  .masthead-meta { font-size: 11px; }
+
+  /* Recipe tabs — espaçamento apertado, wrap saudável */
+  .recipe-tabs { gap: 2px; margin-bottom: 20px; }
+  .recipe-tab { padding: 6px 10px; font-size: 12px; }
+
+  /* Controls — slider + KPIs em 1 coluna */
+  .controls { padding: 16px; gap: 18px; }
+  .loaves-display { gap: 8px; margin-bottom: 6px; }
+  .loaves-num { font-size: 44px; }
+  .loaves-unit { font-size: 18px; }
+  .kpis { grid-template-columns: 1fr !important; gap: 10px; }
+  .kpi { padding: 14px 14px 12px; }
+  .kpi .k-value { font-size: 28px; }
+
+  /* Panels — ingredientes */
+  .panel { padding: 14px; border-radius: 12px; }
+  .panel-head h2 { font-size: 22px; }
+  .panel-head .panel-sub { font-size: 18px; }
+  .panel-head .panel-kicker,
+  .panel-head .panel-sub-label { font-size: 9px; letter-spacing: 0.12em; }
+
+  /* Ingredient row — inputs price/grams encolhidos para caberem */
+  .ing { gap: 6px 8px; padding: 10px 0; }
+  .ing-name { font-size: 14px; }
+  .ing-price-block { font-size: 11px; gap: 3px; row-gap: 4px; }
+  .ing-price-block .in-price,
+  .ing-price-block .in-grams { width: 48px; padding: 3px 4px; font-size: 11px; }
+  .ing-price-block .per-kg { display: none; }    /* secundário, redundante em mobile */
+  .ing-price-block .est { display: none; }       /* "EST" — economiza espaço */
+
+  /* Shopping list — 2 colunas × 2 linhas (nome+need em cima, pkg+cost em baixo) */
+  .list-card { padding: 20px 16px; box-shadow: 0 10px 32px -10px rgba(42,29,18,0.3); }
+  .list-card .close { width: 28px; height: 28px; top: 10px; right: 10px; }
+  .list-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name need"
+      "pkg  cost";
+    gap: 4px 12px;
+    padding: 10px 0;
+    font-size: 13px;
+  }
+  .list-row .lr-name { grid-area: name; font-weight: 500; }
+  .list-row .lr-need { grid-area: need; text-align: right; }
+  .list-row .lr-pkg  { grid-area: pkg;  text-align: left; }
+  .list-row .lr-cost { grid-area: cost; min-width: 0; }
+  .list-row .lr-pkg-n { font-size: 18px; }
+
+  /* New recipe modal — menos padding lateral */
+  .new-recipe-card { padding: 22px 18px !important; }
+
+  /* Admin lock — botão mais pequeno */
+  .lock-btn { padding: 4px 8px; font-size: 11px; }
+}
+
 /* ── Print ──────────────────────────────────────────────── */
 @media print {
   @page { margin: 14mm 14mm; size: A4 portrait; }

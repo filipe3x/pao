@@ -47,7 +47,7 @@ export function Controls({ loaves, setLoaves, recipe, totals }: Props) {
 
       <div
         className="kpis"
-        style={{ margin: 0, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, minWidth: 360 }}
+        style={{ margin: 0, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}
       >
         <div className="kpi">
           <div className="k-label">Mistura seca</div>
