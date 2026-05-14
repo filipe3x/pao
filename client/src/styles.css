@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper:       #f4ecdc;
+  --color-paper-2:     #faf4e6;
+  --color-paper-deep:  #ece1c6;
+  --color-dry-bg:      #ede2c8;
+  --color-fresh-bg:    #e2ebdf;
+  --color-hacks-bg:    #efe6d2;
+  --color-ink:         #2a1d12;
+  --color-ink-soft:    #6b5640;
+  --color-ink-faint:   #9a8870;
+  --color-sienna:      #b04826;
+  --color-sage:        #5b6e3f;
+
+  --font-display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --font-body:    "Manrope", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Regras específicas que Tailwind não cobre directamente vivem aqui:
+   - paper-grain (SVG noise overlay)
+   - exact-stamp rotation
+   - print styles (#print-area)
+   - range slider thumb / track
+   Vão ser preenchidas na Fase 2 com base no styles.css do protótipo. */

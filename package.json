@@ -1,0 +1,44 @@
+{
+  "name": "pao-brasume",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.0.0" },
+  "scripts": {
+    "dev": "concurrently -k -n vite,server -c blue,green \"npm:dev:client\" \"npm:dev:server\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch --env-file=.env server/index.ts",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "tsc -b client/tsconfig.json && vite build",
+    "build:server": "tsc -p server/tsconfig.json",
+    "start": "node --env-file=.env dist-server/index.js",
+    "db:seed": "tsx --env-file=.env server/seed.ts",
+    "db:reset": "rm -f data/pao.db && npm run db:seed",
+    "db:backup": "mkdir -p data/backups && sqlite3 data/pao.db \"VACUUM INTO 'data/backups/pao-$(date +%F).db'\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "lint": "tsc -b client/tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vite-plugin-pwa": "^0.21.1",
+    "vitest": "^2.1.8"
+  }
+}
