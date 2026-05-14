@@ -92,7 +92,7 @@ install -m 0644 "$REPO_DIR/deploy/systemd/pao.service" /etc/systemd/system/pao.s
 # Patch ExecStart com o path absoluto do node detectado em (2).
 # systemd não carrega o profile do user, portanto precisa do binário exacto.
 sed -i "s|^ExecStart=/usr/bin/node|ExecStart=$NODE_BIN|" /etc/systemd/system/pao.service
-echo "    ExecStart=$(grep ^ExecStart= /etc/systemd/system/pao.service)"
+echo "    $(grep ^ExecStart= /etc/systemd/system/pao.service)"
 systemctl daemon-reload
 systemctl enable --now pao
 sleep 1
@@ -101,9 +101,17 @@ systemctl status pao --no-pager -l | head -8 || true
 echo "==> 6. Vhost Apache"
 VHOST_DST="/etc/apache2/sites-available/$DOMAIN.conf"
 CERT_FILE="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+LE_SSL_CONF="/etc/apache2/sites-available/$DOMAIN-le-ssl.conf"
 if [[ -f "$CERT_FILE" ]]; then
   echo "    Cert existe — instalo vhost final (HTTP redirect + HTTPS hardened)"
   install -m 0644 "$REPO_DIR/scripts/apache/$DOMAIN.conf.example" "$VHOST_DST"
+  # certbot --apache cria um vhost :443 paralelo (-le-ssl.conf) sem os
+  # ProxyPass, que se sobrepõe ao nosso. Apagar.
+  if [[ -f "$LE_SSL_CONF" ]]; then
+    echo "    A remover vhost paralelo $LE_SSL_CONF (criado pelo certbot --apache)"
+    a2dissite "$DOMAIN-le-ssl.conf" >/dev/null 2>&1 || true
+    rm -f "$LE_SSL_CONF"
+  fi
 else
   echo "    Sem cert ainda — instalo vhost bootstrap HTTP-only (suficiente p/ Certbot)"
   cat > "$VHOST_DST" <<EOF
