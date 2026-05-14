@@ -16,7 +16,8 @@ RestartSec=3
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
+# read-only (não 'true') porque o binário Node pode estar em ~ember/.nvm/ via nvm
+ProtectHome=read-only
 ReadWritePaths=/var/www/pao/data
 ProtectKernelTunables=true
 ProtectKernelModules=true

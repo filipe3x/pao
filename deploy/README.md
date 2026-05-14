@@ -35,19 +35,16 @@ node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"  
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"  # → ADMIN_SESSION_SECRET
 $EDITOR .env                          # NODE_ENV=production, colar os dois
 
-# 3. Provisionamento (idempotente)
+# 3. Provisionamento — 1.ª vez instala vhost bootstrap HTTP-only
 sudo bash deploy/install.sh
 
-# 4. Certbot — emite o cert e popula a config SSL
-sudo certbot --apache -d pao.brasume.com --redirect --hsts --staple-ocsp \
-    --agree-tos -m webmaster@brasume.com --no-eff-email
+# 4. Certbot — emite o cert para pao.brasume.com
+sudo certbot --apache -d pao.brasume.com --agree-tos \
+    -m webmaster@brasume.com --no-eff-email
 
-# 5. Re-activar o redirect HTTP→HTTPS (o install.sh deixou-o comentado)
-sudo sed -i 's|^  #RewriteEngine On|  RewriteEngine On|;
-             s|^  #RewriteCond %{SERVER_NAME}|  RewriteCond %{SERVER_NAME}|;
-             s|^  #RewriteRule \^ https|  RewriteRule ^ https|' \
-    /etc/apache2/sites-available/pao.brasume.com.conf
-sudo apache2ctl configtest && sudo systemctl reload apache2
+# 5. Re-correr install.sh — agora detecta o cert e instala o vhost final
+#    (HTTP→HTTPS redirect + bloco HTTPS hardened com HSTS, caches, proxy)
+sudo bash deploy/install.sh
 
 # 6. Smoke
 curl -I https://pao.brasume.com/healthz
