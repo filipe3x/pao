@@ -314,6 +314,7 @@ body::before {
 .action-row { display: flex; justify-content: space-between; align-items: center; margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--rule); gap: 16px; flex-wrap: wrap; }
 .action-row .left { color: var(--ink-faint); font-size: 12px; font-family: var(--font-mono); }
 .action-row .save-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--sage); margin-right: 6px; vertical-align: middle; }
+.action-row-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 .btn {
   font-family: var(--font-body); font-size: 13px; font-weight: 500;
@@ -398,9 +399,14 @@ body::before {
   .loaves-display { gap: 8px; margin-bottom: 6px; }
   .loaves-num { font-size: 44px; }
   .loaves-unit { font-size: 18px; }
-  .kpis { grid-template-columns: 1fr !important; gap: 10px; }
-  .kpi { padding: 14px 14px 12px; }
-  .kpi .k-value { font-size: 28px; }
+  .kpis { grid-template-columns: 1fr !important; gap: 10px; min-width: 0; }
+  /* min-width:0 + overflow:hidden: grid items por defeito têm min-width:auto,
+     e em iOS Safari o italic do Newsreader (k-value) cria sidebearings que
+     empurram o card para fora do .controls. Forçar containment. */
+  .kpi { padding: 14px 14px 12px; min-width: 0; overflow: hidden; }
+  .kpi .k-value { font-size: 24px; overflow-wrap: anywhere; }
+  .kpi .k-foot { font-size: 10px; }
+  .kpi .k-unit { font-size: 14px; }
 
   /* Panels — ingredientes */
   .panel { padding: 14px; border-radius: 12px; }
@@ -439,8 +445,17 @@ body::before {
   /* New recipe modal — menos padding lateral */
   .new-recipe-card { padding: 22px 18px !important; }
 
-  /* Admin lock — botão mais pequeno */
-  .lock-btn { padding: 4px 8px; font-size: 11px; }
+  /* Action row — botões empilhados, lock vai para o fundo */
+  .action-row { flex-direction: column; align-items: stretch; gap: 10px; margin-top: 24px; }
+  .action-row .left { text-align: center; }
+  .action-row-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
+  .action-row-actions .btn,
+  .action-row-actions .lock-btn { width: 100%; justify-content: center; }
+  .action-row-actions .lock-btn {
+    order: 99;             /* empurra para o fundo independentemente da ordem JSX */
+    margin-top: 6px;
+    padding: 8px 12px;     /* um pouco mais alto para acomodar o tap area */
+  }
 }
 
 /* ── Print ──────────────────────────────────────────────── */

@@ -301,7 +301,7 @@ export function App() {
           guardado automaticamente · {editedCount} preço{editedCount === 1 ? "" : "s"} editado
           {editedCount === 1 ? "" : "s"}
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="action-row-actions">
           <AdminLockButton />
           {isCustom && (
             <button
