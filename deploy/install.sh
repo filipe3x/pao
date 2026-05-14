@@ -98,31 +98,52 @@ systemctl enable --now pao
 sleep 1
 systemctl status pao --no-pager -l | head -8 || true
 
-echo "==> 6. Vhost Apache (se ainda não existir)"
+echo "==> 6. Vhost Apache"
 VHOST_DST="/etc/apache2/sites-available/$DOMAIN.conf"
-if [[ ! -f "$VHOST_DST" ]]; then
+CERT_FILE="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+if [[ -f "$CERT_FILE" ]]; then
+  echo "    Cert existe — instalo vhost final (HTTP redirect + HTTPS hardened)"
   install -m 0644 "$REPO_DIR/scripts/apache/$DOMAIN.conf.example" "$VHOST_DST"
-  a2ensite "$DOMAIN.conf" >/dev/null
-  # Pré-cert: comentar o redirect HTTP→HTTPS para o desafio HTTP-01 funcionar
-  sed -i 's|^  RewriteEngine On|  #RewriteEngine On|; s|^  RewriteCond %{SERVER_NAME}|  #RewriteCond %{SERVER_NAME}|; s|^  RewriteRule \^ https|  #RewriteRule ^ https|' "$VHOST_DST"
-  apache2ctl configtest
-  systemctl reload apache2
-  echo "    Vhost instalado com o redirect HTTP comentado (até o Certbot correr)."
 else
-  echo "    $VHOST_DST já existe — não toco."
+  echo "    Sem cert ainda — instalo vhost bootstrap HTTP-only (suficiente p/ Certbot)"
+  cat > "$VHOST_DST" <<EOF
+# Bootstrap vhost — gerado por deploy/install.sh.
+# Re-corre o install.sh DEPOIS de 'sudo certbot --apache -d $DOMAIN' para
+# substituir este ficheiro pelo scripts/apache/$DOMAIN.conf.example completo.
+<VirtualHost *:80>
+  ServerName $DOMAIN
+  DocumentRoot $REPO_DIR/client/dist
+  <Directory $REPO_DIR/client/dist>
+    Options -Indexes +FollowSymLinks
+    AllowOverride None
+    Require all granted
+  </Directory>
+  ErrorLog  \${APACHE_LOG_DIR}/pao_error.log
+  CustomLog \${APACHE_LOG_DIR}/pao_access.log combined
+</VirtualHost>
+EOF
 fi
+a2ensite "$DOMAIN.conf" >/dev/null
+apache2ctl configtest
+systemctl reload apache2
 
 echo "==> 7. Cron diário de backup"
 install -m 0755 "$REPO_DIR/deploy/cron/pao-backup" /etc/cron.daily/pao-backup
 
 echo
-echo "==> Pronto. Falta:"
-echo
-echo "  sudo certbot --apache -d $DOMAIN --redirect --hsts --staple-ocsp \\"
-echo "      --agree-tos -m webmaster@brasume.com --no-eff-email"
-echo
-echo "  # depois (o cert popula os paths /etc/letsencrypt/live/$DOMAIN/...):"
-echo "  sudo sed -i 's|^  #RewriteEngine On|  RewriteEngine On|; s|^  #RewriteCond %{SERVER_NAME}|  RewriteCond %{SERVER_NAME}|; s|^  #RewriteRule \^ https|  RewriteRule ^ https|' $VHOST_DST"
-echo "  sudo apache2ctl configtest && sudo systemctl reload apache2"
-echo
-echo "  curl -I https://$DOMAIN/healthz"
+if [[ -f "$CERT_FILE" ]]; then
+  echo "==> Pronto. Smoke test:"
+  echo "  curl -I https://$DOMAIN/healthz"
+else
+  echo "==> Pronto, bootstrap. Falta:"
+  echo
+  echo "  # 1) Emitir cert:"
+  echo "  sudo certbot --apache -d $DOMAIN --agree-tos \\"
+  echo "      -m webmaster@brasume.com --no-eff-email"
+  echo
+  echo "  # 2) Re-correr este install.sh — agora detecta o cert e instala o vhost final:"
+  echo "  sudo bash deploy/install.sh"
+  echo
+  echo "  # 3) Smoke:"
+  echo "  curl -I https://$DOMAIN/healthz"
+fi

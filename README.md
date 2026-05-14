@@ -76,10 +76,10 @@ sudo git clone https://github.com/filipe3x/pao.git
 sudo chown -R ember:http-web pao
 cd pao
 cp .env.example .env && $EDITOR .env       # NODE_ENV=production + segredos fortes
-sudo bash deploy/install.sh
-sudo certbot --apache -d pao.brasume.com --redirect --hsts --staple-ocsp \
-    --agree-tos -m webmaster@brasume.com --no-eff-email
-# re-activar o HTTP→HTTPS redirect (ver deploy/README.md passo 5)
+sudo bash deploy/install.sh                # 1.ª vez: vhost bootstrap HTTP-only
+sudo certbot --apache -d pao.brasume.com --agree-tos \
+    -m webmaster@brasume.com --no-eff-email
+sudo bash deploy/install.sh                # 2.ª vez: detecta cert, vhost final HTTPS
 curl -I https://pao.brasume.com/healthz
 ```
 
