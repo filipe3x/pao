@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type-check
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build (client + server)
+        run: npm run build
+
+      - name: Seed sanity-check (usa o build, sem tsx)
+        run: |
+          mkdir -p data
+          cat > .env.ci <<'EOF'
+          DB_PATH=./data/pao.db
+          ADMIN_PASSWORD=ci-placeholder-password
+          ADMIN_SESSION_SECRET=ci-placeholder-secret-long-enough
+          EOF
+          node --env-file=.env.ci dist-server/seed.js
+          test -s data/pao.db
