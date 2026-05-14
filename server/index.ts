@@ -26,8 +26,24 @@ app.use("/api/recipes", recipesRouter);
 // SPA fallback em produção (servir client/dist).
 if (isProd) {
   const clientDist = path.resolve(__dirname, "../client/dist");
-  app.use(express.static(clientDist, { maxAge: "1y", immutable: true, index: false }));
+  // Assets com hash no nome → cache imutável.
+  app.use(
+    "/assets",
+    express.static(path.join(clientDist, "assets"), { maxAge: "1y", immutable: true })
+  );
+  // Resto (incluindo sw.js, manifest, index.html) → sem cache agressivo.
+  app.use(
+    express.static(clientDist, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html") || filePath.endsWith("sw.js") || filePath.endsWith(".webmanifest")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      }
+    })
+  );
   app.get(/^\/(?!api|healthz).*/, (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.join(clientDist, "index.html"));
   });
 }
