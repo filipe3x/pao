@@ -1,0 +1,33 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build
+client/dist/
+dist-server/
+*.tsbuildinfo
+
+# playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# data (SQLite db + backups)
+data/
+/var/lib/pao/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
