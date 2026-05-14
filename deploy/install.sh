@@ -45,13 +45,16 @@ echo "==> 1. Permissões do repo (ember:http-web)"
 chown -R "$APP_USER:$APP_GROUP" "$REPO_DIR"
 install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$DATA_DIR" "$DATA_DIR/backups"
 
-echo "==> 2. Confirmar Node 22"
-NODE_V="$(sudo -u "$APP_USER" node -v 2>/dev/null || true)"
+echo "==> 2. Confirmar Node 22 (carrega o profile do $APP_USER para apanhar nvm)"
+NODE_BIN="$(sudo -u "$APP_USER" bash -lc 'command -v node' 2>/dev/null || true)"
+NODE_V="$(sudo -u "$APP_USER" bash -lc 'node -v' 2>/dev/null || true)"
 if [[ ! "$NODE_V" =~ ^v22\. ]]; then
   echo "[!] Node 22 não detectado para $APP_USER (got: '$NODE_V')." >&2
-  echo "    Instala via NodeSource:  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash - && sudo apt-get install -y nodejs" >&2
+  echo "    Se usas nvm, garante que 'nvm alias default 22' está activo." >&2
+  echo "    Ou instala via NodeSource:  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash - && sudo apt-get install -y nodejs" >&2
   exit 1
 fi
+echo "    Node $NODE_V em $NODE_BIN"
 
 echo "==> 3. Módulos Apache necessários"
 a2enmod proxy proxy_http rewrite headers ssl deflate mime >/dev/null
@@ -61,8 +64,13 @@ sudo -u "$APP_USER" bash -lc "cd '$REPO_DIR' && npm ci && npm run build && npm r
 
 echo "==> 5. systemd unit"
 install -m 0644 "$REPO_DIR/deploy/systemd/pao.service" /etc/systemd/system/pao.service
+# Patch ExecStart com o path absoluto do node detectado em (2).
+# systemd não carrega o profile do user, portanto precisa do binário exacto.
+sed -i "s|^ExecStart=/usr/bin/node|ExecStart=$NODE_BIN|" /etc/systemd/system/pao.service
+echo "    ExecStart=$(grep ^ExecStart= /etc/systemd/system/pao.service)"
 systemctl daemon-reload
 systemctl enable --now pao
+sleep 1
 systemctl status pao --no-pager -l | head -8 || true
 
 echo "==> 6. Vhost Apache (se ainda não existir)"
