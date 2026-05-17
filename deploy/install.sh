@@ -97,6 +97,15 @@ if systemctl list-unit-files | grep -q '^pao\.service'; then
   systemctl daemon-reload
 fi
 
+# 5a-bis) Defensiva: se sobrou algum orphan node a segurar :3050 (typicamente
+# do antigo systemd quando a unit foi removida sem stop), encerrá-lo. Sem isto
+# o pm2 start crasha com EADDRINUSE e reinicia em loop.
+if ss -tln 2>/dev/null | grep -q ':3050 '; then
+  echo "    :3050 ocupada — a libertar (provavelmente orphan do systemd antigo)"
+  fuser -k 3050/tcp &>/dev/null || true
+  sleep 1
+fi
+
 # 5b) Localizar pm2 no ambiente do user (provavelmente em ~ember/.nvm/.../bin/pm2).
 PM2_BIN="$(sudo -u "$APP_USER" bash -c "source '$NVM_SH' && command -v pm2" 2>/dev/null || true)"
 if [[ -z "$PM2_BIN" ]]; then
